@@ -337,7 +337,7 @@ class WhichStocksToBuy(StockAction):
         with open("company_names.pkl", "wb") as f:
             pickle.dump(company_names, f)
 
-        print("✅ FAISS index built and saved successfully!")
+        print("FAISS index built and saved successfully")
         return index, company_vectors, company_names
 
     def _find_best_matching_companies(self, user_sector: str, top_n=10):
@@ -408,7 +408,6 @@ class WhichStocksToBuy(StockAction):
                 percent_change = ((end_price - start_price) / start_price) * 100
                 if percent_change < 0:
                     continue
-                # don't add repeated stocks
                 if (name, symbol) in stock_performance:
                     continue
                 stock_performance.append((name, symbol, percent_change))
