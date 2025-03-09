@@ -111,7 +111,7 @@ FINANCE_QUERY_CLASSIFICATION_PROMPT = """
     Last query: '{last_query}'. 
     Last action taken: '{last_action}'. 
     Based on the query, stock (if any), last query, and last action, determine if the following user question and stock combination is related to the following  topics: {allowed_topics}
-    Reply with only 'yes' or 'no'.
+    Reply ONLY with 'yes' or 'no'.
 """
 
 SECTOR_EXTRACT_PROMPT = """

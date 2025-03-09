@@ -32,7 +32,7 @@ STOCK_ACTIONS = {
     "is_stock_worth_buying": IsStockWorthBuying(), # Finance & News API
     "get_top_stocks_performing_in_market": GetTopPerformers(), # Finance API
     "get_market_or_sector_trends": GetMarketOrSectorTrends(), # Finance API
-    "general_investment_query": GeneralInvestmentQuery(), # General LLM
+    "general_finance_market_or_investment_related_query": GeneralInvestmentQuery(), # General LLM
     "what_can_you_do": WhatCanYouDo(), # General LLM
     "fallback_response": FallbackResponse() # General LLM
 }
