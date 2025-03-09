@@ -17,7 +17,6 @@ import spacy
 import faiss
 import pickle
 import numpy as np
-from pytickersymbols import PyTickerSymbols
 from tqdm import tqdm
 import datetime
 import yfinance as yf
@@ -220,13 +219,10 @@ class WhichStocksToBuy(StockAction):
         self.nlp = spacy.load("en_core_web_lg")
         self.top_n = top_n
         self.index, self.company_vectors, self.company_names = self._load_or_build_faiss_index()
-        x = PyTickerSymbols().get_stocks_by_index("S&P 500")
-        stocks_list = list(x)
-        industries = []
-        for i in range(len(stocks_list)):
-            if "industries" in stocks_list[i]:
-                industries.extend(stocks_list[i]['industries'])
-        self.possible_sectors = list(set(industries))
+
+        with open("sectors.csv", "r") as f:
+            sectors = f.readlines()
+        self.possible_sectors = [sector.strip() for sector in sectors]
 
 
     def _load_or_build_faiss_index(self):
@@ -243,9 +239,11 @@ class WhichStocksToBuy(StockAction):
             return self._build_faiss_index()
 
     def _build_faiss_index(self):
-        sp500_stocks = list(PyTickerSymbols().get_stocks_by_index("S&P 500"))
-        nasdaq_stocks = list(PyTickerSymbols().get_stocks_by_index("NASDAQ 100"))
-        all_stocks = sp500_stocks + nasdaq_stocks
+
+        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")[0]
+        sp_500_stocks = table['Symbol'].to_list()
+        # nasdaq_stocks = list(PyTickerSymbols().get_stocks_by_index("NASDAQ 100"))
+        all_stocks = sp_500_stocks
         print(f"[DEBUG] Found {len(all_stocks)} companies to index")
 
         company_vectors = []
@@ -309,17 +307,18 @@ class WhichStocksToBuy(StockAction):
         top_n = extract_top_n_from_query(user_phrase)
         print(f"[DEBUG] SECTOR: {sector}")
         print(f"[DEBUG] TOP N: {top_n}")
-        sp500_stocks = list(PyTickerSymbols().get_stocks_by_index("S&P 500"))
-        nasdaq_stocks = list(PyTickerSymbols().get_stocks_by_index("NASDAQ 100"))
+
+        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")[0]
+        sp500_stocks = table['Symbol'].to_list()
+        # nasdaq_stocks = list(PyTickerSymbols().get_stocks_by_index("NASDAQ 100"))
 
         if sector != "None" and sector != "none":
             matched_companies = self._find_best_matching_companies(sector, top_n=50)
             sp500_stocks = [stock for stock in sp500_stocks if stock["name"] in {name for name, _ in matched_companies}]
-            nasdaq_stocks = [stock for stock in nasdaq_stocks if stock["name"] in {name for name, _ in matched_companies}]
-            print(f"[DEBUG] Found {len(sp500_stocks + nasdaq_stocks)} stocks in sector:{sector}")
+            # nasdaq_stocks = [stock for stock in nasdaq_stocks if stock["name"] in {name for name, _ in matched_companies}]
+            print(f"[DEBUG] Found {len(sp500_stocks)} stocks in sector:{sector}")
 
-        combined_stocks = sp500_stocks + nasdaq_stocks
-        df_stocks = pd.DataFrame(combined_stocks)
+        df_stocks = pd.DataFrame(sp500_stocks)
         df_stocks = df_stocks.drop_duplicates(subset=['symbol'])
 
         stock_performance = []

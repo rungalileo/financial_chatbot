@@ -12,7 +12,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from datetime import datetime, timedelta
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from pytickersymbols import PyTickerSymbols
 from IPython.display import display, HTML
 from utils.llm_utils import ask_openai
 from prompts import GET_STOCK_SYMBOL_PROMPT, RATING_BASED_ON_NEWS_PROMPT
