@@ -144,13 +144,13 @@ class WhichStocksToBuy(StockAction):
         progress_bar = st.progress(0)
         analyze_image_placeholder = st.empty()
 
-        status_msg = st.markdown("Fetching stock performance data...")
+        status_msg = st.markdown("")
         analyze_image_placeholder.image("analyze.gif", caption="Analyzing markets... ")
 
         few_mins_markdown = st.markdown("This might take a few minutes... Get yourself some coffee ☕️ and come back. ")
         for i, symbol in enumerate(df_stocks['symbol']):
             if sector.lower() != "none":
-                progress_bar.text(f"Idenified {len(df_stocks)} stocks in the {sector} (and related) sectors.\nFurther analyzing: {i + 1} out of {len(df_stocks)}...")
+                progress_bar.text(f"Idenified {len(df_stocks)} stocks.\nFurther analyzing: {i + 1} out of {len(df_stocks)}...")
             else:
                 progress_bar.text(f"Identified {len(df_stocks)} stocks. Analyzing performance: {i + 1} out of {len(df_stocks)}")
                 few_mins_markdown.markdown("This might take a few minutes... Get yourself some coffee ☕️ and come back. Or hit Cmd/Ctrl+R and ask something more specific like technology stocks.")
@@ -238,7 +238,9 @@ class WhichStocksToBuy(StockAction):
             faiss.normalize_L2(sector_vector)
 
             # Search FAISS index
-            distances, indices = index.search(sector_vector, 50)
+            # choose a random number between 45 and 65
+            num_similar = random.randint(45, 65)
+            distances, indices = index.search(sector_vector, num_similar)
 
             # get similarity score 1 standard deviation away from the top score
             # top_score = distances[0][0]
