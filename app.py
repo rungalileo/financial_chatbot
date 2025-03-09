@@ -6,44 +6,14 @@ from typing import TypedDict
 from langchain.schema import AIMessage
 from dotenv import load_dotenv
 from tools import STOCK_ACTIONS
-
-# from langchain.agents import initialize_agent, AgentType
-# from tools import stock_price_tool, stock_history_tool, tell_me_about_company_tool, get_news_tool, is_worth_buying_tool, get_top_performers_tool
+from prompts import TOOL_SELECTION_PROMPT, GET_STOCK_SYMBOL_PROMPT, FINANCE_QUERY_CLASSIFICATION_PROMPT
+from utils.agent_state import StockAgentState
 
 load_dotenv()
 
 action = StockActionExecutor()
 
-
-## TOOL SETUP
-# tools = [
-#     stock_price_tool, 
-#     stock_history_tool, 
-#     tell_me_about_company_tool, 
-#     get_news_tool, 
-#     is_worth_buying_tool, 
-#     get_top_performers_tool
-# ]
-
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
-# agent = initialize_agent(
-#     tools=tools,
-#     llm=llm,
-#     agent=AgentType.OPENAI_FUNCTIONS,
-#     verbose=True,
-#     handle_parsing_errors=True,
-#     max_iterations=1,
-#     return_intermediate_steps=True
-# )
-
-class StockAgentState(TypedDict):
-    input: str
-    action: str
-    result: str
-    last_stock_symbol: str
-    last_query: str
-    last_action: str
 
 ########################################################
 # ROUTER
@@ -51,38 +21,20 @@ class StockAgentState(TypedDict):
 
 def is_finance_query(query: str, stock_to_use: str, allowed_topics: list[str], last_query: str, last_action: str) -> bool:
 
-    classification_prompt = (
-        f"User Query: '{query}'. \n\n"
-        f"Stock being discussed: {stock_to_use}. \n\n"
-        f"Last query: '{last_query}'. \n\n"
-        f"Last action taken: '{last_action}'. \n\n"
-        f"Based on the query, stock (if any), last query, and last action, determine if the following user question and stock combination is related to the following  topics: {allowed_topics}\n"
-        f"Reply with only 'yes' or 'no'."
+    classification_prompt = FINANCE_QUERY_CLASSIFICATION_PROMPT.format(
+        query=query,
+        stock_to_use=stock_to_use,
+        last_query=last_query,
+        last_action=last_action,
+        allowed_topics=allowed_topics
     )
-    print(f"[DEBUG][ROUTER] IS FINANCE PROMPT: {classification_prompt}")
     response = llm.invoke(classification_prompt).content.strip().lower()
     return response == "yes"
 
 def extract_stock_symbol_llm(user_input: str) -> str:
-    llm_prompt = f"""
-    You are a financial expert specializing in stock market data.
-	- The user query is: {user_input}
-	- The user might be asking about a stock symbol or referring to a company name.
-	- Your task is to extract the relevant stock symbol (e.g., AAPL for Apple, TSLA for Tesla).
-
-    Instructions:
-	1.	If the query directly mentions a stock symbol, return the exact symbol (e.g., “AAPL” if the user input is “What is AAPL trading at?”).
-	2.	If the query refers to a company name, return the corresponding stock symbol (e.g., “TSLA” for “Tesla”).
-	3.	If the query does not clearly reference a specific stock or company, return “None” (without quotes).
-
-    Output format:
-	- Return ONLY the stock symbol in uppercase (e.g., “AAPL”).
-	- If no valid stock symbol is found, return “None”.
-	- Do not include any explanations, extra text, or formatting.
-    """
+    llm_prompt = GET_STOCK_SYMBOL_PROMPT.format(user_phrase=user_input)
     response = llm.invoke(llm_prompt).content.strip().upper()
     return None if response == "NONE" else response
-
 
 def route_stock_action(state: StockAgentState) -> StockAgentState:
 
@@ -98,27 +50,15 @@ def route_stock_action(state: StockAgentState) -> StockAgentState:
         print(f"[DEBUG][ROUTER] Not finance related! Returning fallback tool.")
         return {**state, "action": "fallback_response"}
 
-    tool_selection_prompt = f"""
-        User asked the question: '{user_input}'.
-        The stock being discussed is: {stock_to_use}.
-
-        Conversation history:
-        - Previous query: {last_query}
-        - Previous action: {last_action}
-        - Last stock symbol: {last_stock}
-
-        Based on the user query, select the BEST tool possible to handle this query from this list of tools:
-        {list(STOCK_ACTIONS.keys())}.
-
-        INSTRUCTIONS:
-        1. Use previous query and previous action as a guideline, but not a strict rule.
-        2. Use best judgment to choose the most relevant tool.
-        3. If the last stock symbol and the current stock symbol are different, give preference to the current stock symbol.
-        4. If both are none or empty, don't choose any tool about a particular stock.
-        5. ONLY choose 'fallback_response' when you are unsure.
-        6. ONLY return the tool name.
-    """
-
+    tool_selection_prompt = TOOL_SELECTION_PROMPT.format(
+        user_phrase=user_input,
+        stock_to_use=stock_to_use,
+        last_query=last_query,
+        last_action=last_action,
+        last_stock=last_stock,
+        stock_actions=list(STOCK_ACTIONS.keys())
+    )
+ 
     llm_response = llm.invoke(tool_selection_prompt)
 
     tool_response = llm_response.content.strip().lower() if isinstance(llm_response, AIMessage) else str(llm_response).strip().lower()
@@ -206,8 +146,6 @@ if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'How is A
         }
     )
 
-    # response = graph.invoke({"input": prompt})
-    # response = workflow.invoke({"input": prompt})
     if "result" in response:
         stock_action_result = response["result"]
     else:
@@ -223,14 +161,3 @@ if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'How is A
             st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
         else:
             st.error(f"Agent did not return a tool response: {response}")
-
-        # if "intermediate_steps" in response and response["intermediate_steps"]:
-        #     tool_output = response["intermediate_steps"][0][1]  # Get first tool response
-        #     if isinstance(tool_output, dict) and "output_type" in tool_output:
-        #         result = StockActionResult.from_dict(tool_output)
-        #         ResultRenderer.render(result)
-        #         st.session_state.messages.append({"role": "assistant", "content": result})
-        #     else:
-        #         st.error(f"Unexpected tool output format: {tool_output}")
-        # else:
-        #     st.error(f"Agent did not return a tool response: {response}")

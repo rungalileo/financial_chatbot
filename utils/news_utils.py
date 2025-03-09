@@ -1,10 +1,9 @@
 import requests
 import yfinance as yf
 import time
-import json
-from openai import OpenAI
 from datetime import datetime, timedelta
 from utils.finance_utils import buy_or_sell
+import streamlit as st
 import os
 from dotenv import load_dotenv
 
@@ -12,8 +11,11 @@ load_dotenv()
 
 def get_news_newsapi_org(ticker: str) -> tuple[str, list[str]]:
     url = "https://newsapi.org/v2/everything"
+
+    # first load from os.getenv, if not found, then load from streamlit secrets
     api_key = os.getenv("NEWSAPI_API_KEY")
-    print(f"[DEBUG] NEWS qqAPI KEY: {api_key}")
+    if api_key is None:
+        api_key = st.secrets["NEWSAPI_API_KEY"]
 
     stock = yf.Ticker(ticker)
     all_news_article_content = ""

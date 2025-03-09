@@ -1,196 +1,30 @@
-from utils.actions_utils import StockAction, StockActionResult, StockActionCompoundResult
-from utils.finance_utils import simplify_dollar_amount, worth_buying, plot_stock_chart
-from utils.llm_utils import ask_openai, extract_time_period_from_query, extract_top_n_from_query, is_not_none
-from utils.news_utils import get_news_newsapi_org
-from pytickersymbols import PyTickerSymbols
-from actions.prompts import EXTRACT_FROM_STOCK_INFO_PROMPT
-from actions.error_dialogs import CAN_ONLY_DO_PERF_INFO_ON_SPECIFIC_STOCKS, PLEASE_SPECIFY_A_STOCK
+from utils.stock_action_types import StockActionWithState, StockActionResult, StockActionCompoundResult
+from utils.agent_state import StockAgentState
+from utils.finance_utils import simplify_dollar_amount, plot_stock_chart
 from utils.finance_utils import get_stock_symbol_from_user_phrase
+from actions.error_dialogs import PLEASE_SPECIFY_A_STOCK
+from utils.llm_utils import extract_time_period_from_query
+from utils.stock_action_types import StockAction, StockActionResult, StockActionCompoundResult
+from actions.general_llm_actions import GeneralInvestmentQuery
+from prompts import GET_FIELD_FROM_STOCK_INFO_PROMPT
+from utils.news_utils import get_news_newsapi_org
+from utils.llm_utils import ask_openai, extract_time_period_from_query, extract_top_n_from_query, is_not_none
+from utils.finance_utils import plot_stock_chart
+from utils.llm_utils import is_not_none
 
-from tqdm import tqdm
-import yfinance as yf
-import streamlit as st
-import pandas as pd
-import random
-import datetime
+
 import spacy
 import faiss
 import pickle
 import numpy as np
+from pytickersymbols import PyTickerSymbols
+from tqdm import tqdm
+import datetime
+import yfinance as yf
+import pandas as pd
+import random
+import streamlit as st
 
-
-class WhatCanYouDo(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        from tools import STOCK_ACTIONS
-        action_names = list(STOCK_ACTIONS.keys())
-        action_names = [name for name in action_names if name not in ["fallback_response", "what_can_you_do"]]
-        action_names = [name.replace("_", " ").capitalize() for name in action_names]
-        action_names_string = ", ".join(action_names)
-        action_names_string = "<ul>" + "\n".join([f"<li>{name}</li>" for name in action_names]) + "</ul>"
-        return StockActionResult(f"I can help you with the following: {action_names_string}", "html")
-
-class FallbackResponse(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        return StockActionResult(
-            "I'm not programmed to answer this. I'm a financial guru. Ask me about stock prices, stock history, top performers, etc.", "html")
-
-class GeneralInvestmentQuery(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        intermediate_response = st.markdown(f"Answering your query...")
-        prompt = f"Answer in brief, the following question: {user_phrase}, Stock symbol: {stock_symbol}"
-        response = ask_openai(user_content=prompt)
-        intermediate_response.markdown("")
-        return StockActionResult(response, "html")
-
-class CompanyFinanceQuestionAndAnswer(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
-
-        if stock_symbol == "None":
-            return GeneralInvestmentQuery().execute(user_phrase, stock_symbol)
-
-        stock = yf.Ticker(stock_symbol)
-        info = stock.info
-
-        extract_from_stock_info_prompt = f"""
-        {EXTRACT_FROM_STOCK_INFO_PROMPT}
-        User question: {user_phrase}
-        Company: {stock_symbol}
-        Information:
-        ```json
-        {info}
-        ```
-        """
-        response = ask_openai(user_content=extract_from_stock_info_prompt)
-        return StockActionResult(response, "html")
-
-class GetTopPerformers(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        st.markdown("Let's see what the top performers are...")
-        N = extract_top_n_from_query(user_phrase)
-        if is_not_none(N):
-            st.markdown(f"Let's see the top {N} performers...")
-            return WhichStocksToBuy(top_n=int(N)).execute(user_phrase, stock_symbol)
-        else:
-            return WhichStocksToBuy().execute(user_phrase, stock_symbol)
-
-class GetNewsAndSentiment(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
-
-        if stock_symbol == "None":
-            return StockActionResult(PLEASE_SPECIFY_A_STOCK, "html")
-
-        st.markdown(f"Let's see what the market is saying about {stock_symbol}...")
-
-        print(f"STOCK SYMBOL: {stock_symbol}")
-
-        recommendation, authors = get_news_newsapi_org(stock_symbol)
-
-        authors_list = "".join(f"<li>{author}</li>" for author in authors if author)
-        headlines_list = "".join(f"<li>{headline}</li>" for headline in recommendation['headlines'])
-
-        html_table = f"""
-        <table>
-            <tr><th style='text-align: left;'>Authors</th><td>{authors_list}</td></tr>
-            <tr><th style='text-align: left;'>Headlines</th><td>{headlines_list}</td></tr>
-            <tr><th style='text-align: left;'>Reasoning</th><td>{recommendation['reason']}</td></tr>
-            <tr><th style='text-align: left;'>Sentiment</th><td>{recommendation['rating']}</td></tr>
-        </table>
-        """
-        prediction = plot_stock_chart(stock_symbol, '1y')
-
-        return StockActionCompoundResult([
-            html_table, 
-            f"Here is how {stock_symbol} has done in the last year", 
-            prediction], 
-            ["html", "html", "chart"])
-
-class IsStockWorthBuying(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
-
-        if stock_symbol == "None":
-            return StockActionResult(CAN_ONLY_DO_PERF_INFO_ON_SPECIFIC_STOCKS, "html")
-
-        intermediate_response = st.markdown(f"Let's see if {stock_symbol} is worth buying...")
-        recommendation, authors = get_news_newsapi_org(stock_symbol)
-
-        res = worth_buying(stock_symbol)
-        
-
-        stock_chart = plot_stock_chart(stock_symbol, '2y')
-
-        main_response = f"""
-            <p>Pure stats says that {stock_symbol} is a {res}. 
-            And according to recent news, {stock_symbol} is a {recommendation['rating']}.</p>
-        """
-
-        stock_news_data, authors = get_news_newsapi_org(stock_symbol)
-        stock_news_data_html = f"""
-            <p>Summary of the latest news about {stock_symbol}:</p>
-            <ul>
-                {stock_news_data['reason']}
-            </ul>
-        """
-        intermediate_response.markdown("")
-        return StockActionCompoundResult([
-            main_response,
-            stock_chart,
-            stock_news_data_html,
-            "In the end, it's up to you. So do your own research and make your own decision!"
-        ],
-        ["html", "chart", "html", "html"])
-
-class TellMeAboutThisCompany(StockAction):
-
-    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
-
-        if stock_symbol == "None":
-            return StockActionResult(CAN_ONLY_DO_PERF_INFO_ON_SPECIFIC_STOCKS, "html")
-
-        st.markdown(f"Let's see what we can find about {stock_symbol}...")
-
-        try:
-            stock = yf.Ticker(stock_symbol)
-            df = stock.history(period='2y').dropna()
-        except Exception as e:
-            return StockActionResult(f"Error in stock agent: API call failed.", "html")
-
-        if df.empty:
-            return StockActionResult("No stock data available.", "html")
-
-        df["Percent Diff"] = ((df["Close"] - df["Open"]) / df["Open"]) * 100
-        stock_value_today = df['Close'].iloc[-1]
-
-        stock_info = stock.info
-        market_cap = simplify_dollar_amount(f"${stock_info.get('marketCap', 0):,.2f}")
-        arr = simplify_dollar_amount(f"${stock_info.get('totalRevenue', 0):,.2f}")
-        total_cash = simplify_dollar_amount(f"${stock_info.get('totalCash', 0):,.2f}")
-        industry = stock_info.get("industry", "Unknown Industry")
-        city = stock_info.get("city", "Unknown City")
-
-        week_change = stock_info.get("52WeekChange", 0) * 100
-
-        html_content = f"""
-            <p>{stock_symbol} is a {city}-based company, specializing in {industry}.</p>
-            <p>It has a market cap of <span style="color: green;">{market_cap}</span>. 
-            Total ARR is <span style="color: green;">{arr}</span> and it holds 
-            <span style="color: blue;">{total_cash}</span> in cash.</p>
-            <p>Its 52-week change is <span style="color: red;">{week_change:.2f}%</span>, 
-            and its stock value today is <span style="color: red;">${stock_value_today:,.2f}</span>.</p>
-            <p>Hope that helps!</p>
-        """
-
-        return StockActionResult(html_content, "html")
 
 class GetStockPrice(StockAction):
 
@@ -247,7 +81,6 @@ class GetStockPrice(StockAction):
 
         return StockActionCompoundResult([dialog, plot_chart], ["html", "chart"])
 
-
 ## Get stock performance in the last X days|weeks|months|years
 class GetStockPerformance(StockAction):
 
@@ -267,7 +100,7 @@ class GetStockPerformance(StockAction):
         stock = yf.Ticker(stock_symbol)
         history = stock.history(period='5d')
         history = history.iloc[::-1]
-        history = history[['Open', 'High', 'Low', 'Close']]
+        history = history[['Close']]
         intermediate_response.markdown("")
 
         prediction = plot_stock_chart(stock_symbol, time_window=time_period)
@@ -278,6 +111,108 @@ class GetStockPerformance(StockAction):
             f"Here's more recent data from the past week", 
             history], 
             ["html", "chart", "html", "dataframe"])
+
+
+class CompareStocks(StockActionWithState):
+    def execute(self, user_phrase: str, stock_symbols: str, state: StockAgentState) -> StockActionResult:
+        stock_list = stock_symbols.split(",")
+        if len(stock_list) != 2:
+            return StockActionResult("Please provide exactly two stock symbols for comparison.", "html")
+
+        stock1, stock2 = stock_list
+        ticker1, ticker2 = yf.Ticker(stock1), yf.Ticker(stock2)
+
+        try:
+            info1, info2 = ticker1.info, ticker2.info
+        except Exception as e:
+            return StockActionResult(f"Error fetching stock data: {e}", "html")
+
+        # Select key financial metrics for comparison
+        keys = {
+            "currentPrice": "Current Price",
+            "marketCap": "Market Cap",
+            "totalRevenue": "Total Revenue",
+            "netIncomeToCommon": "Net Income",
+            "trailingPE": "Trailing P/E",
+            "forwardPE": "Forward P/E",
+            "profitMargins": "Profit Margins",
+            "returnOnAssets": "Return on Assets",
+            "returnOnEquity": "Return on Equity",
+            "debtToEquity": "Debt to Equity",
+            "dividendRate": "Dividend Rate",
+            "dividendYield": "Dividend Yield"
+        }
+
+        data = []
+        for key, metric_name in keys.items():
+            value1 = info1.get(key, "N/A")
+            value2 = info2.get(key, "N/A")
+
+            # Format values
+            if isinstance(value1, (int, float)):
+                if key in ["marketCap", "totalRevenue", "netIncomeToCommon"]:
+                    value1 = f"${simplify_dollar_amount(str(value1))}"
+                else:
+                    value1 = f"{round(value1, 1)}"
+
+            if isinstance(value2, (int, float)):
+                if key in ["marketCap", "totalRevenue", "netIncomeToCommon"]:
+                    value2 = f"${simplify_dollar_amount(str(value2))}"
+                else:
+                    value2 = f"{round(value2, 1)}"
+
+            # Ensure all values are strings to prevent serialization issues
+            data.append([metric_name, str(value1), str(value2)])
+
+        # Create a pandas DataFrame
+        df = pd.DataFrame(data, columns=["Metric", stock1, stock2])
+
+        state["last_stock_symbol"] = None
+        state["last_query"] = None
+        state["last_action"] = None
+
+        return StockActionCompoundResult(
+            [
+                f"Alright, here is a comparison of {stock1} and {stock2}:",
+                df
+            ],
+            ["html", "dataframe"]
+        )
+
+class CompanyFinanceQuestionAndAnswer(StockAction):
+
+    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
+        stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
+        print(f"[DEBUG] STOCK SYMBOL(S): {stock_symbol}")
+
+        stock_list = stock_symbol.split(",")
+
+        if len(stock_list) == 2:
+            stock1, stock2 = stock_list
+            ticker1, ticker2 = yf.Ticker(stock1), yf.Ticker(stock2)
+        else:
+            stock1 = stock_list[0]
+            ticker1 = yf.Ticker(stock1)
+
+        if stock_symbol == "None":
+            return GeneralInvestmentQuery().execute(user_phrase, stock_symbol)
+
+        stock = yf.Ticker(stock_symbol)
+        info = stock.info
+
+        extract_from_stock_info_prompt = f"""
+        {GET_FIELD_FROM_STOCK_INFO_PROMPT}
+        User question: {user_phrase}
+        Company: {stock_symbol}
+        Information:
+        ```json
+        {info}
+        ```
+        """
+        response = ask_openai(user_content=extract_from_stock_info_prompt)
+        return StockActionResult(response, "html")
+
+
 
 class WhichStocksToBuy(StockAction):
 
@@ -429,6 +364,16 @@ class WhichStocksToBuy(StockAction):
         analyze_image_placeholder.empty()
         return StockActionResult(df_results, "dataframe")
 
+class GetTopPerformers(StockAction):
+
+    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
+        st.markdown("Let's see what the top performers are...")
+        N = extract_top_n_from_query(user_phrase)
+        if is_not_none(N):
+            st.markdown(f"Let's see the top {N} performers...")
+            return WhichStocksToBuy(top_n=int(N)).execute(user_phrase, stock_symbol)
+        else:
+            return WhichStocksToBuy().execute(user_phrase, stock_symbol)
 
 class GetMarketOrSectorTrends(StockAction):
 

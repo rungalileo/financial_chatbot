@@ -1,13 +1,21 @@
 import os
 from openai import OpenAI
+from prompts import TIME_PERIOD_EXTRACT_PROMPT
+import streamlit as st
+from dotenv import load_dotenv
 
+load_dotenv()
 
 def ask_openai(
     user_content,
     system_content="You are a smart assistant", 
-    api_key=os.getenv("OPENAI_API_KEY"), 
     model="gpt-4o-mini"
 ):
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key is None:
+        api_key = st.secrets["OPENAI_API_KEY"]
+
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model=model,
@@ -21,14 +29,7 @@ def ask_openai(
     return output
 
 def extract_time_period_from_query(user_phrase: str) -> str:
-    time_period_extraction_prompt = f"""
-        The user asked: "{user_phrase}".
-        Identify the time period mentioned in this query.
-        It can be ONLY amongst the following time periods: [1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max].
-        There is no "week", only days (d), months (mo), years (y), ytd (year to date) and max.
-        Approximate the time period to the nearest time period in the list above.
-        Return ONLY the time period name e.g. 1d, 5d, 1mo, 3mo etc.
-    """
+    time_period_extraction_prompt = TIME_PERIOD_EXTRACT_PROMPT.format(user_phrase=user_phrase)
     time_period = ask_openai(user_content=time_period_extraction_prompt).strip().lower()
     return time_period
 

@@ -15,7 +15,8 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from pytickersymbols import PyTickerSymbols
 from IPython.display import display, HTML
 from utils.llm_utils import ask_openai
-from actions.prompts import GET_STOCK_SYMBOL_PROMPT
+from prompts import GET_STOCK_SYMBOL_PROMPT, RATING_BASED_ON_NEWS_PROMPT
+
 import matplotlib.dates as mdates
 import os
 
@@ -33,12 +34,12 @@ warnings.filterwarnings("ignore")
 
 def get_stock_symbol_from_user_phrase(user_phrase: str, stock_symbol: str) -> str:
     if not stock_symbol:
-        stock_symbol_prompt = f"{GET_STOCK_SYMBOL_PROMPT}\n\n User sentence: {user_phrase}"
+        stock_symbol_prompt = GET_STOCK_SYMBOL_PROMPT.format(user_phrase=user_phrase)
         stock_symbol = ask_openai(user_content=stock_symbol_prompt)
     print(f"[DEBUG][Inside Action] STOCK SYMBOL: {stock_symbol}")
     return stock_symbol
 
-def simplify_dollar_amount(amount_str):
+def simplify_dollar_amount(amount_str: str) -> str:
     amount = float(amount_str.replace('$', '').replace(',', ''))
     if amount >= 1_000_000_000:
         amount /= 1_000_000_000
@@ -75,23 +76,7 @@ def classify_valuation(ticker):
 def buy_or_sell(content, company_name="the company"):
     try:
         time.sleep(1)
-        rating_based_on_news_content = f"""
-            You are a smart financial analyst.
-            The content below are news articles related to the market performance of {company_name}.
-            Rate STRONG BUY, BUY or SELL based on sentiment on the company in the content.
-            Output the rating, along with a short one-line summary on why, describing the sentiment.
-            STRICTLY return the output in the following JSON format:
-            {{
-                "rating": "STRONG BUY",
-                "reason": "The company is expected to grow by 20% in the next quarter."
-                "headlines: ["headline1", "headline2"]
-            }}
-            Provide a list headings of the top 5 most relevant articles in the headlines field.
-            Even if the article is not directly related to the stock performance, provide a rating based on the sentiment if the content indirectly talks about the company's performance.
-            If you you are unsure, output NOT ENOUGH INFORMATION in the rating field.
-            Provide a reason in the reason field.
-            Content: " + {content}
-        """
+        rating_based_on_news_content = RATING_BASED_ON_NEWS_PROMPT.format(content=content, company_name=company_name)
         client = OpenAI()
         response = client.chat.completions.create(
             model="gpt-4o-mini",
