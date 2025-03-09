@@ -12,6 +12,7 @@ from utils.llm_utils import ask_openai, extract_time_period_from_query, extract_
 from utils.finance_utils import plot_stock_chart
 from utils.llm_utils import is_not_none
 from actions.stock_buying_actions import WhichStocksToBuy
+from utils.finance_utils import merge_results
 
 import spacy
 import faiss
@@ -102,14 +103,16 @@ class GetStockPerformance(StockAction):
         history = history[['Close']]
         intermediate_response.markdown("")
 
-        prediction = plot_stock_chart(stock_symbol, time_window=time_period)
+        # prediction = plot_stock_chart(stock_symbol, time_window=time_period)
+        get_stock_price_action_result = GetStockPrice().execute(user_phrase, stock_symbol)
 
-        return StockActionCompoundResult([
-            f"Here's <b>{stock_symbol}'s</b> performance over the last <b>{time_period}</b>", 
-            prediction, 
-            f"Here's more recent data from the past week", 
-            history], 
-            ["html", "chart", "html", "dataframe"])
+        stock_performance_action_result = StockActionCompoundResult([
+            "Here's more recent data from the past week", 
+            history
+        ], 
+        ["html", "dataframe"])
+
+        return merge_results([get_stock_price_action_result, stock_performance_action_result])
 
 
 class CompareStocks(StockAction):

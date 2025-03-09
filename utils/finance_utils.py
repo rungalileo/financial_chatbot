@@ -15,6 +15,7 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from IPython.display import display, HTML
 from utils.llm_utils import ask_openai
 from prompts import GET_STOCK_SYMBOL_PROMPT, RATING_BASED_ON_NEWS_PROMPT
+from utils.stock_action_types import StockActionCompoundResult
 
 import matplotlib.dates as mdates
 import os
@@ -189,3 +190,12 @@ def worth_buying(stock):
     except Exception as e:
         return "Unable to predict"
     return prediction[0]
+
+
+def merge_results(stock_action_compound_results: list[StockActionCompoundResult]) -> StockActionCompoundResult:
+    data_structures = []
+    output_types = []
+    for result in stock_action_compound_results:
+        data_structures.extend(result.data_structures)
+        output_types.extend(result.output_types)
+    return StockActionCompoundResult(data_structures, output_types)

@@ -4,10 +4,15 @@ import pandas as pd
 from utils.agent_state import StockAgentState
 from dotenv import load_dotenv
 import os
+from dataclasses import dataclass
 
 load_dotenv()
 
+@dataclass
 class StockActionCompoundResult:
+    data_structures: list[Any]
+    output_types: list[str]
+
     def __init__(self, data_structures: list[Any], output_types: list[str]):
         self.data_structures = data_structures
         self.output_types = output_types
