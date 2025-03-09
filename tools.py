@@ -2,7 +2,6 @@ from actions.finance_actions import (
     GetStockPrice, 
     GetStockPerformance, 
     GetTopPerformers, 
-    WhichStocksToBuy, 
     GetMarketOrSectorTrends, 
     GeneralInvestmentQuery, 
     CompanyFinanceQuestionAndAnswer, 
@@ -16,6 +15,9 @@ from actions.finance_news_actions import (
 from actions.general_llm_actions import (
     WhatCanYouDo,
     FallbackResponse
+)
+from actions.stock_buying_actions import (
+    WhichStocksToBuy
 )
 
 STOCK_ACTIONS = {

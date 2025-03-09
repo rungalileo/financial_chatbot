@@ -113,3 +113,12 @@ FINANCE_QUERY_CLASSIFICATION_PROMPT = """
     Based on the query, stock (if any), last query, and last action, determine if the following user question and stock combination is related to the following  topics: {allowed_topics}
     Reply with only 'yes' or 'no'.
 """
+
+SECTOR_EXTRACT_PROMPT = """
+    The user asked: "{user_phrase}".
+    Identify the industry sector mentioned in this query.
+    It can be amongst the following sectors:
+    {possible_sectors}
+    ONLY return the exact sector name (closest match), not any surrounding text.
+    If you cannot find a relevant sector, return the exact string "None".
+"""
