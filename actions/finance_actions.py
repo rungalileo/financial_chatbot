@@ -112,8 +112,8 @@ class GetStockPerformance(StockAction):
             ["html", "chart", "html", "dataframe"])
 
 
-class CompareStocks(StockActionWithState):
-    def execute(self, user_phrase: str, stock_symbols: str, state: StockAgentState) -> StockActionResult:
+class CompareStocks(StockAction):
+    def execute(self, user_phrase: str, stock_symbols: str) -> StockActionResult:
         stock_list = stock_symbols.split(",")
         if len(stock_list) != 2:
             return StockActionResult("Please provide exactly two stock symbols for comparison.", "html")
@@ -165,10 +165,6 @@ class CompareStocks(StockActionWithState):
 
         # Create a pandas DataFrame
         df = pd.DataFrame(data, columns=["Metric", stock1, stock2])
-
-        state["last_stock_symbol"] = None
-        state["last_query"] = None
-        state["last_action"] = None
 
         return StockActionCompoundResult(
             [
