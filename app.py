@@ -119,7 +119,7 @@ for message in st.session_state.messages:
         else:
             st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'How is Apple stock doing?' 📈"):
+if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
 
     st.chat_message("user").markdown(prompt)
 
