@@ -107,57 +107,58 @@ def execute_stock_action(state: StockAgentState) -> StockAgentState:
 
 ########################################################
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+def main():
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        if type(message["content"]) == StockActionResult:
-            ResultRenderer.render(message["content"])
-        elif type(message["content"]) == StockActionCompoundResult:
-            ResultRenderer.render(message["content"])
-        else:
-            st.markdown(message["content"])
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            if type(message["content"]) == StockActionResult:
+                ResultRenderer.render(message["content"])
+            elif type(message["content"]) == StockActionCompoundResult:
+                ResultRenderer.render(message["content"])
+            else:
+                st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
+    if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
 
-    st.chat_message("user").markdown(prompt)
+        st.chat_message("user").markdown(prompt)
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    if "graph_state" not in st.session_state:
-        st.session_state.graph_state = {"last_stock_symbol": None, "last_query": None, "last_action": None}
+        if "graph_state" not in st.session_state:
+            st.session_state.graph_state = {"last_stock_symbol": None, "last_query": None, "last_action": None}
 
-    workflow = StateGraph(StockAgentState)
-    workflow.add_node("router", route_stock_action)
-    workflow.add_node("executor", execute_stock_action)
-    workflow.add_edge("router", "executor")
-    workflow.set_entry_point("router")
-    graph = workflow.compile()
+        workflow = StateGraph(StockAgentState)
+        workflow.add_node("router", route_stock_action)
+        workflow.add_node("executor", execute_stock_action)
+        workflow.add_edge("router", "executor")
+        workflow.set_entry_point("router")
+        graph = workflow.compile()
 
-    print("INVOKING DAG...")
- 
-    response = graph.invoke(
-        {
-            "input": prompt, 
-            "last_stock_symbol": st.session_state.graph_state["last_stock_symbol"],
-            "last_query": st.session_state.graph_state["last_query"],
-            "last_action": st.session_state.graph_state["last_action"]
-        }
-    )
+        print("INVOKING DAG...")
+    
+        response = graph.invoke(
+            {
+                "input": prompt, 
+                "last_stock_symbol": st.session_state.graph_state["last_stock_symbol"],
+                "last_query": st.session_state.graph_state["last_query"],
+                "last_action": st.session_state.graph_state["last_action"]
+            }
+        )
 
-    if "result" in response:
-        stock_action_result = response["result"]
-    else:
-        stock_action_result = None
+        stock_action_result = response.get("result")
+        
+        st.session_state.graph_state["last_stock_symbol"] = response.get("last_stock_symbol", None)
+        st.session_state.graph_state["last_query"] = response.get("last_query", None)
+        st.session_state.graph_state["last_action"] = response.get("last_action", None)
 
-    st.session_state.graph_state["last_stock_symbol"] = response.get("last_stock_symbol", None)
-    st.session_state.graph_state["last_query"] = response.get("last_query", None)
-    st.session_state.graph_state["last_action"] = response.get("last_action", None)
+        with st.chat_message("assistant"):
+            if stock_action_result:
+                ResultRenderer.render(stock_action_result)
+                st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
+            else:
+                st.error(f"Agent did not return a tool response: {response}")
 
-    with st.chat_message("assistant"):
-        if stock_action_result:
-            ResultRenderer.render(stock_action_result)
-            st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
-        else:
-            st.error(f"Agent did not return a tool response: {response}")
+if __name__ == "__main__":
+    main()
