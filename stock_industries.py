@@ -31,8 +31,6 @@ def fetch_industry_data(stocks):
 
             stock_info = yf.Ticker(symbol).info
             industry = stock_info.get("industry", "Unknown")
-
-            print(f"[SUCCESS] {symbol}: {industry}")
             industry_data.append((symbol, industry))
         except Exception as e:
             print(f"[ERROR] Failed to fetch industry for {symbol}: {e}")

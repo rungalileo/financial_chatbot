@@ -11,7 +11,7 @@ def ask_openai(
     system_content="You are a smart assistant", 
     model="gpt-4o-mini"
 ):
-
+    print("LLM Call: ask_openai")
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key is None:
         api_key = st.secrets["OPENAI_API_KEY"]

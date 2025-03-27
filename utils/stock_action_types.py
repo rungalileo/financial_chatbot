@@ -56,6 +56,10 @@ class StockAction(ABC):
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         pass
 
+    @abstractmethod
+    def get_description(self) -> str:
+        pass
+
 class StockActionWithState(ABC):
     @abstractmethod
     def execute(self, user_phrase: str, stock_symbol: str, state: StockAgentState) -> StockActionResult:

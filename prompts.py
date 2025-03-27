@@ -10,13 +10,13 @@ GET_STOCK_SYMBOL_PROMPT = """
 	1. If the query directly mentions a stock symbol, return the exact symbol (e.g., “AAPL” if the user input is “What is AAPL trading at?”).
 	2. If the query refers to a company name, return the corresponding stock symbol (e.g., “TSLA” for “Tesla”).
 	3. If the query does not clearly reference a specific stock or company, return “None” (without quotes).
-    4. If there are multiple stock symbols, return them in a comma separated list e.g. "AAPL, TSLA"
+    4. If there are multiple stock symbols, return them in a comma separated list e.g. "AAPL, TSLA"            
 
     Output format:
 	- Return ONLY the stock symbol in uppercase (e.g., “AAPL”).
 	- If no valid stock symbol is found, return “None”.
 	- Do not include any explanations, extra text, or formatting.
-    """
+"""
 
 TOOL_SELECTION_PROMPT = """
     User asked the question: '{user_phrase}'.
@@ -109,8 +109,10 @@ FINANCE_QUERY_CLASSIFICATION_PROMPT = """
     User Query: '{query}'. 
     Stock being discussed: {stock_to_use}. 
     Last query: '{last_query}'. 
-    Last action taken: '{last_action}'. 
-    Based on the query, stock (if any), last query, and last action, determine if the following user question and stock combination is related to the following  topics: {allowed_topics}
+    Last action taken: '{last_action}'.
+    Based on the query, stock (if any), last query, and last action, \n
+    determine if the combination is related to the following  topics: 
+    {allowed_topics}
     Reply ONLY with 'yes' or 'no'.
 """
 

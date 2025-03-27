@@ -8,10 +8,17 @@ from dotenv import load_dotenv
 from tools import STOCK_ACTIONS
 from prompts import TOOL_SELECTION_PROMPT, GET_STOCK_SYMBOL_PROMPT, FINANCE_QUERY_CLASSIFICATION_PROMPT
 from utils.agent_state import StockAgentState
+import os
+from galileo.handlers.langchain import GalileoCallback
+from langchain_core.runnables import RunnableConfig
+
+gcb = GalileoCallback()
 
 load_dotenv()
 
 action = StockActionExecutor()
+
+main_llm = os.getenv("LLM")
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
@@ -46,7 +53,12 @@ def route_stock_action(state: StockAgentState) -> StockAgentState:
     extracted_stock = extract_stock_symbol_llm(user_input)
     stock_to_use = extracted_stock if extracted_stock else last_stock
 
-    if not is_finance_query(user_input, stock_to_use, list(STOCK_ACTIONS.keys()), last_query, last_action):
+    # loop through all the keys, get the Stock Action and concatenate the outputs of get_description
+    stock_action_descriptions = []
+    for action_name in STOCK_ACTIONS.keys():
+        stock_action_descriptions.append(action_name)
+
+    if not is_finance_query(user_input, stock_to_use, stock_action_descriptions, last_query, last_action):
         print(f"[DEBUG][ROUTER] Not finance related! Returning fallback tool.")
         return {**state, "action": "fallback_response"}
 
@@ -137,14 +149,18 @@ def main():
         graph = workflow.compile()
 
         print("INVOKING DAG...")
-    
+
+        cfg = RunnableConfig()
+        cfg['callbacks'] = [gcb]
+
         response = graph.invoke(
             {
                 "input": prompt, 
                 "last_stock_symbol": st.session_state.graph_state["last_stock_symbol"],
                 "last_query": st.session_state.graph_state["last_query"],
                 "last_action": st.session_state.graph_state["last_action"]
-            }
+            },
+            config=cfg
         )
 
         stock_action_result = response.get("result")

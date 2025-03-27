@@ -26,6 +26,15 @@ class WhichStocksToBuy(StockAction):
         self.index, self.company_vectors, self.company_names = self._load_or_build_faiss_index()
         print(f"[DEBUG] Possible sectors: {len(self.possible_sectors)}")
 
+    def get_description(self) -> str:
+        return """
+            Queries about whic stocks (generally or within a particular sector) should a user buy or invest in.
+            Example queries:
+            - What healthcare stocks should I buy?
+            - Top 10 tech stocks to invest in
+            - Top 100 energy stocks to buy
+        """
+
     def _load_stock_data(self):
         """Loads stock symbols and industries from a pre-fetched CSV file."""
         try:

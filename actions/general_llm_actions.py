@@ -4,6 +4,19 @@ import streamlit as st
 
 class GeneralInvestmentQuery(StockAction):
 
+    def get_description(self) -> str:
+        return """
+            Ask a general question about the stock market, investing, or finance.
+            Example queries:
+            - What is the best way to diversify my investment portfolio?
+            - How should I invest in the stock market?
+            - What are the key differences between ETFs and mutual funds?
+            - What are some common mistakes new investors make?
+            - How do stock buybacks impact share prices?
+            - How can I generate passive income through investments?
+            - What factors drive stock market crashes?
+        """
+
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         intermediate_response = st.markdown(f"Answering your query...")
         prompt = f"Answer in brief, the following question: {user_phrase}, Stock symbol: {stock_symbol}"
@@ -13,6 +26,17 @@ class GeneralInvestmentQuery(StockAction):
 
 
 class WhatCanYouDo(StockAction):
+
+    def get_description(self) -> str:
+        return """
+            Ask what I can do.
+            Example queries:
+            - What can you do?
+            - What are your capabilities?
+            - What more can you do?
+            - What are you capable of?
+            - Hi, what can you do?
+        """
 
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         from tools import STOCK_ACTIONS
@@ -26,6 +50,17 @@ class WhatCanYouDo(StockAction):
 
 class FallbackResponse(StockAction):
 
+    def get_description(self) -> str:
+        return """
+            Fallback response for when the user asks a question that is not related to stocks, investing, or finance.
+            Or any garbage non-sense query would fall under this category.
+            This includes all canned dialogs.
+            Example queries:
+            - What is the weather in New York?
+            - What is the capital of France?
+            - What is the meaning of life?
+        """
+
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         return StockActionResult(
-            "I'm not programmed to answer this. I'm a financial guru. Ask me about stock prices, stock history, top performers, etc.", "html")
+            "I'm not programmed to answer this. Ask me about stocks, investing, or just ask me what I can do.", "html")

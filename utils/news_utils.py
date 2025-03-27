@@ -9,11 +9,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_news_newsapi_org(ticker: str) -> tuple[str, list[str]]:
+def get_market_news() -> tuple[list[str], list[str]]:
+    url = "https://newsapi.org/v2/everything"
+    api_key = os.getenv("NEWSAPI_API_KEY")
+    if api_key is None:
+        api_key = st.secrets["NEWSAPI_API_KEY"]
+
+    current_date = datetime.today()
+
+    params = {
+        'apikey': api_key,
+        'q': '"stock market" OR "S&P 500" OR "NASDAQ" OR "Dow Jones" OR "market update"',
+        'language': 'en',
+        'sortBy': "publishedAt",
+    }
+    response = requests.get(url, params=params)
+    authors = []
+    titles = []
+    if response.status_code == 200:
+        articles = response.json().get('articles', [])
+        for i, article in enumerate(articles):
+            if i >= 10:
+                break
+            authors.append(article.get('author', ''))
+            titles.append(article.get('title', ''))
+    else:
+        print(f"Error: {response.status_code}")
+        return None
+
+    return list(set(authors)), list(set(titles))
+
+def get_news_for_stock(ticker: str) -> tuple[str, list[str]]:
     url = "https://newsapi.org/v2/everything"
 
     # first load from os.getenv, if not found, then load from streamlit secrets
     api_key = os.getenv("NEWSAPI_API_KEY")
+
     if api_key is None:
         api_key = st.secrets["NEWSAPI_API_KEY"]
 

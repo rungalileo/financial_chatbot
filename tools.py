@@ -5,12 +5,14 @@ from actions.finance_actions import (
     GetMarketOrSectorTrends, 
     GeneralInvestmentQuery, 
     CompanyFinanceQuestionAndAnswer, 
-    CompareStocks
+    CompareStocks,
+    GetETFPrice
 )
 from actions.finance_news_actions import (
     GetNewsAndSentiment,
     TellMeAboutThisCompany,
-    IsStockWorthBuying
+    IsStockWorthBuying,
+    GetMarketNews
 )
 from actions.general_llm_actions import (
     WhatCanYouDo,
@@ -21,6 +23,7 @@ from actions.stock_buying_actions import (
 )
 
 STOCK_ACTIONS = {
+    "get_etf_price": GetETFPrice(), # Finance API
     "get_stock_price": GetStockPrice(), # Finance API
     "get_stock_performance": GetStockPerformance(), # Finance API
     "compare_two_different_stocks": CompareStocks(), # Finance API
@@ -32,7 +35,9 @@ STOCK_ACTIONS = {
     "is_stock_worth_buying": IsStockWorthBuying(), # Finance & News API
     "get_top_stocks_performing_in_market": GetTopPerformers(), # Finance API
     "get_market_or_sector_trends": GetMarketOrSectorTrends(), # Finance API
+    "get_market_news": GetMarketNews(), # News API
     "general_finance_market_or_investment_related_query": GeneralInvestmentQuery(), # General LLM
     "what_can_you_do": WhatCanYouDo(), # General LLM
-    "fallback_response": FallbackResponse() # General LLM
+    "fallback_response": FallbackResponse(), # General LLM
+    # "get_brents_favorite_stocks": GetBrentsFavoriteStocks() # General LLM
 }

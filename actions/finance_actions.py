@@ -7,7 +7,7 @@ from utils.llm_utils import extract_time_period_from_query
 from utils.stock_action_types import StockAction, StockActionResult, StockActionCompoundResult
 from actions.general_llm_actions import GeneralInvestmentQuery
 from prompts import GET_FIELD_FROM_STOCK_INFO_PROMPT, SECTOR_EXTRACT_PROMPT
-from utils.news_utils import get_news_newsapi_org
+from utils.news_utils import get_news_for_stock
 from utils.llm_utils import ask_openai, extract_time_period_from_query, extract_top_n_from_query, is_not_none
 from utils.finance_utils import plot_stock_chart
 from utils.llm_utils import is_not_none
@@ -26,10 +26,36 @@ import random
 import streamlit as st
 
 
+class GetETFPrice(StockAction):
+
+    def get_description(self) -> str:
+        return """
+            Get the current price of an ETF.
+            Example queries:
+            - What's the price of SPY?
+            - How is the price of QQQ doing?
+            - What's the price of the S&P 500?
+        """
+    
+    def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
+        # stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
+        return StockActionResult("ETF Price demo", "html")
+        
+
 class GetStockPrice(StockAction):
 
     def __init__(self):
         self.stock_price = None
+
+    def get_description(self) -> str:
+        return """
+            Get the current price of a stock.
+            You can also ask for the price of a stock in the last X days|weeks|months|years.
+            Example queries:
+            - What's the price of AAPL?
+            - How has the price of TSLA been in the last month?
+            - What about NVDA in the last year?
+        """
 
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
@@ -81,8 +107,17 @@ class GetStockPrice(StockAction):
 
         return StockActionCompoundResult([dialog, plot_chart], ["html", "chart"])
 
-## Get stock performance in the last X days|weeks|months|years
+
 class GetStockPerformance(StockAction):
+
+    def get_description(self) -> str:
+        return """
+            Ask for the performance of a particular stock or stocks, optionally in the last X days|weeks|months|years.
+            Example queries:
+            - How has the price of AAPL been in the last 2 weeks?
+            - How is Apple doing?
+            - How has NVDA done in the last month?
+        """
 
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         return self.execute(user_phrase, stock_symbol, '2w')
@@ -116,6 +151,16 @@ class GetStockPerformance(StockAction):
 
 
 class CompareStocks(StockAction):
+
+    def get_description(self) -> str:
+        return """
+            Compare the performance of two stocks.
+            Example queries:
+            - Compare AAPL and TSLA
+            - How is apple doing compared to tesla?
+            - Do a comparison of NVDA and MSFT
+        """
+
     def execute(self, user_phrase: str, stock_symbols: str) -> StockActionResult:
         stock_list = stock_symbols.split(",")
         if len(stock_list) != 2:
@@ -177,7 +222,22 @@ class CompareStocks(StockAction):
             ["html", "dataframe"]
         )
 
+
 class CompanyFinanceQuestionAndAnswer(StockAction):
+
+    def get_description(self) -> str:
+        return """
+            Ask a question about a company's financials.
+            Choose from the following topics:
+            'sector', 'fullTimeEmployees', 'companyOfficers', 'auditRisk', 'boardRisk', 'compensationRisk', 'shareHolderRightsRisk', 'overallRisk', 'governanceEpochDate', 'compensationAsOfEpochDate', 'irWebsite', 'executiveTeam', 'maxAge', 'priceHint', 'previousClose', 'open', 'dayLow', 'dayHigh', 'regularMarketPreviousClose', 'regularMarketOpen', 'regularMarketDayLow', 'regularMarketDayHigh', 'dividendRate', 'dividendYield', 'exDividendDate', 'payoutRatio', 'fiveYearAvgDividendYield', 'beta', 'trailingPE', 'forwardPE', 'volume', 'regularMarketVolume', 'averageVolume', 'averageVolume10days', 'averageDailyVolume10Day', 'bid', 'ask', 'bidSize', 'askSize', 'marketCap', 'fiftyTwoWeekLow', 'fiftyTwoWeekHigh', 'priceToSalesTrailing12Months', 'fiftyDayAverage', 'twoHundredDayAverage', 'trailingAnnualDividendRate', 'trailingAnnualDividendYield', 'currency', 'tradeable', 'enterpriseValue', 'profitMargins', 'floatShares', 'sharesOutstanding', 'sharesShort', 'sharesShortPriorMonth', 'sharesShortPreviousMonthDate', 'dateShortInterest', 'sharesPercentSharesOut', 'heldPercentInsiders', 'heldPercentInstitutions', 'shortRatio', 'shortPercentOfFloat', 'impliedSharesOutstanding', 'bookValue', 'priceToBook', 'lastFiscalYearEnd', 'nextFiscalYearEnd', 'mostRecentQuarter', 'earningsQuarterlyGrowth', 'netIncomeToCommon', 'trailingEps', 'forwardEps', 'lastSplitFactor', 'lastSplitDate', 'enterpriseToRevenue', 'enterpriseToEbitda', '52WeekChange', 'SandP52WeekChange', 'lastDividendValue', 'lastDividendDate', 'quoteType', 'currentPrice', 'targetHighPrice', 'targetLowPrice', 'targetMeanPrice', 'targetMedianPrice', 'recommendationMean', 'recommendationKey', 'numberOfAnalystOpinions', 'totalCash', 'totalCashPerShare', 'ebitda', 'totalDebt', 'quickRatio', 'currentRatio', 'totalRevenue', 'debtToEquity', 'revenuePerShare', 'returnOnAssets', 'returnOnEquity', 'grossProfits', 'freeCashflow', 'operatingCashflow', 'earningsGrowth', 'revenueGrowth', 'grossMargins', 'ebitdaMargins', 'operatingMargins', 'financialCurrency', 'symbol', 'language', 'region', 'typeDisp', 'quoteSourceName', 'triggerable', 'customPriceAlertConfidence', 'shortName', 'longName', 'regularMarketChangePercent', 'regularMarketPrice', 'corporateActions', 'postMarketTime', 'regularMarketTime', 'exchange', 'messageBoardId', 'exchangeTimezoneName', 'exchangeTimezoneShortName', 'gmtOffSetMilliseconds', 'market', 'esgPopulated', 'marketState', 'sourceInterval', 'exchangeDataDelayedBy', 'averageAnalystRating', 'cryptoTradeable', 'hasPrePostMarketData', 'firstTradeDateMilliseconds', 'postMarketChangePercent', 'postMarketPrice', 'postMarketChange', 'regularMarketChange', 'regularMarketDayRange', 'fullExchangeName', 'averageDailyVolume3Month', 'fiftyTwoWeekLowChange', 'fiftyTwoWeekLowChangePercent', 'fiftyTwoWeekRange', 'fiftyTwoWeekHighChange', 'fiftyTwoWeekHighChangePercent', 'fiftyTwoWeekChangePercent', 'dividendDate', 'earningsTimestamp', 'earningsTimestampStart', 'earningsTimestampEnd', 'earningsCallTimestampStart', 'earningsCallTimestampEnd', 'isEarningsDateEstimate', 'epsTrailingTwelveMonths', 'epsForward', 'epsCurrentYear', 'priceEpsCurrentYear', 'fiftyDayAverageChange', 'fiftyDayAverageChangePercent', 'twoHundredDayAverageChange', 'twoHundredDayAverageChangePercent', 'displayName', 'trailingPegRatio'
+            Example queries:
+            - How much revenue does Apple make?
+            - What's the net income of Tesla?
+            - How is Apple doing financially?
+            - What is Google's P/E ratio?
+            - How many employees does Apple have?
+            - What is the overall risk of Apple?
+        """
 
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
@@ -211,16 +271,26 @@ class CompanyFinanceQuestionAndAnswer(StockAction):
         return StockActionResult(response, "html")
 
 
-
 class GetTopPerformers(StockAction):
 
+    def get_description(self) -> str:
+        return """
+            Get the top performing stocks , either generally or in a particular sector.
+            Assume that the user is hinting at asking for buying recommendations.
+            Example queries:
+            - What are the top performing stocks?
+            - What are the top performing stocks in the S&P 500?
+            - What are the top performing stocks in the healthcare sector?
+        """
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
         st.markdown("Let's see what the top performers are...")
         N = extract_top_n_from_query(user_phrase)
+
         if is_not_none(N):
             return WhichStocksToBuy(top_n=int(N)).execute(user_phrase, stock_symbol)
         else:
             return WhichStocksToBuy().execute(user_phrase, stock_symbol)
+
 
 class GetMarketOrSectorTrends(StockAction):
 
@@ -231,12 +301,24 @@ class GetMarketOrSectorTrends(StockAction):
             "Dow Jones": "^DJI"
         }
 
+    def get_description(self) -> str:
+        return """
+            Get the trends of the market or a particular sector.
+            Example queries:
+            - What's the trend of the S&P 500?
+            - How is the construction industry doing this year?
+            - How is the S&P 500 doing?
+            - How is the NASDAQ doing?
+            - What about the Dow Jones?
+        """
+
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
 
-        st.markdown("📈 🤓 Analyzing the market's 2 year trends...")
+        st.markdown("📈 🤓 Analyzing market trends...")
         
         predictions = []
-        
+
+        # sp500, nasdaq, dow
         for name, symbol in self.INDICES.items():
             try:
                 stock = yf.Ticker(symbol)
@@ -258,7 +340,7 @@ class GetMarketOrSectorTrends(StockAction):
                 continue
         
         st.markdown("Here's the market sentiment from recent news...")
-        sentiment_data, _ = get_news_newsapi_org("^GSPC")
+        sentiment_data, _ = get_news_for_stock("^GSPC")
 
         sentiment = sentiment_data['rating'] if sentiment_data else "neutral"
         reasoning = sentiment_data['reason'] if sentiment_data else "No strong bias detected."
