@@ -11,6 +11,7 @@ from utils.agent_state import StockAgentState
 import os
 from galileo.handlers.langchain import GalileoCallback
 from langchain_core.runnables import RunnableConfig
+from galileo import galileo_context
 
 gcb = GalileoCallback()
 
@@ -120,61 +121,66 @@ def execute_stock_action(state: StockAgentState) -> StockAgentState:
 ########################################################
 
 def main():
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            if type(message["content"]) == StockActionResult:
-                ResultRenderer.render(message["content"])
-            elif type(message["content"]) == StockActionCompoundResult:
-                ResultRenderer.render(message["content"])
-            else:
-                st.markdown(message["content"])
+    with galileo_context() as GC, st.container() as ST:
 
-    if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-        st.chat_message("user").markdown(prompt)
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                if type(message["content"]) == StockActionResult:
+                    ResultRenderer.render(message["content"])
+                elif type(message["content"]) == StockActionCompoundResult:
+                    ResultRenderer.render(message["content"])
+                else:
+                    st.markdown(message["content"])
 
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
 
-        if "graph_state" not in st.session_state:
-            st.session_state.graph_state = {"last_stock_symbol": None, "last_query": None, "last_action": None}
+            st.chat_message("user").markdown(prompt)
 
-        workflow = StateGraph(StockAgentState)
-        workflow.add_node("router", route_stock_action)
-        workflow.add_node("executor", execute_stock_action)
-        workflow.add_edge("router", "executor")
-        workflow.set_entry_point("router")
-        graph = workflow.compile()
+            st.session_state.messages.append({"role": "user", "content": prompt})
 
-        print("INVOKING DAG...")
+            if "graph_state" not in st.session_state:
+                st.session_state.graph_state = {"last_stock_symbol": None, "last_query": None, "last_action": None}
 
-        cfg = RunnableConfig()
-        cfg['callbacks'] = [gcb]
+            workflow = StateGraph(StockAgentState)
+            workflow.add_node("router", route_stock_action)
+            workflow.add_node("executor", execute_stock_action)
+            workflow.add_edge("router", "executor")
+            workflow.set_entry_point("router")
+            graph = workflow.compile()
 
-        response = graph.invoke(
-            {
-                "input": prompt, 
-                "last_stock_symbol": st.session_state.graph_state["last_stock_symbol"],
-                "last_query": st.session_state.graph_state["last_query"],
-                "last_action": st.session_state.graph_state["last_action"]
-            },
-            config=cfg
-        )
+            print("INVOKING DAG...")
 
-        stock_action_result = response.get("result")
+            cfg = RunnableConfig()
+            cfg['callbacks'] = [gcb]
+
+            response = graph.invoke(
+                {
+                    "input": prompt, 
+                    "last_stock_symbol": st.session_state.graph_state["last_stock_symbol"],
+                    "last_query": st.session_state.graph_state["last_query"],
+                    "last_action": st.session_state.graph_state["last_action"]
+                },
+                config=cfg
+            )
+
+            stock_action_result = response.get("result")
+            
+            st.session_state.graph_state["last_stock_symbol"] = response.get("last_stock_symbol", None)
+            st.session_state.graph_state["last_query"] = response.get("last_query", None)
+            st.session_state.graph_state["last_action"] = response.get("last_action", None)
+
+            with st.chat_message("assistant"):
+                if stock_action_result:
+                    ResultRenderer.render(stock_action_result)
+                    st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
+                else:
+                    st.error(f"Agent did not return a tool response: {response}")
         
-        st.session_state.graph_state["last_stock_symbol"] = response.get("last_stock_symbol", None)
-        st.session_state.graph_state["last_query"] = response.get("last_query", None)
-        st.session_state.graph_state["last_action"] = response.get("last_action", None)
-
-        with st.chat_message("assistant"):
-            if stock_action_result:
-                ResultRenderer.render(stock_action_result)
-                st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
-            else:
-                st.error(f"Agent did not return a tool response: {response}")
+        galileo_context.flush()
 
 if __name__ == "__main__":
     main()

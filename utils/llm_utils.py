@@ -3,9 +3,11 @@ from openai import OpenAI
 from prompts import TIME_PERIOD_EXTRACT_PROMPT
 import streamlit as st
 from dotenv import load_dotenv
+from galileo import log
 
 load_dotenv()
 
+@log
 def ask_openai(
     user_content,
     system_content="You are a smart assistant", 
