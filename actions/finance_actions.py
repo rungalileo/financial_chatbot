@@ -120,9 +120,9 @@ class GetStockPerformance(StockAction):
         """
 
     def execute(self, user_phrase: str, stock_symbol: str) -> StockActionResult:
-        return self._execute(user_phrase, stock_symbol, '2w')
+        return self.execute(user_phrase, stock_symbol, '2w')
 
-    def _execute(self, user_phrase: str, stock_symbol: str, time_period: str = '2w') -> StockActionResult:
+    def execute(self, user_phrase: str, stock_symbol: str, time_period: str = '2w') -> StockActionResult:
         stock_symbol = get_stock_symbol_from_user_phrase(stock_symbol=stock_symbol, user_phrase=user_phrase)
 
         time_period = extract_time_period_from_query(user_phrase)
