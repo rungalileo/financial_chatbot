@@ -16,7 +16,6 @@ import os
 from galileo_core.schemas.logging.llm import Message, ToolCall, ToolCallFunction
 from langchain_core.runnables import RunnableConfig
 from galileo import GalileoLogger
-import inspect
 
 
 load_dotenv()
@@ -173,6 +172,8 @@ def main():
 
         if "messages" not in st.session_state:
             st.session_state.messages = []
+        if "session_id" not in st.session_state:
+            st.session_state.session_id = datetime.now(ZoneInfo("America/Detroit")).strftime("%Y%m%d-%H%M%S")
 
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
@@ -188,7 +189,8 @@ def main():
             galileo_logger.start_trace(
                 input=prompt,
                 name=f"User Interaction {n_trace}",
-                created_at=datetime.now(ZoneInfo("America/Detroit"))
+                created_at=datetime.now(ZoneInfo("America/Detroit")),
+                metadata={"session_id": st.session_state.session_id},
             )            
             
                 
