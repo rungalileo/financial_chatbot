@@ -1,3 +1,7 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import json
+from json import tool
 import streamlit as st
 from utils.actions_utils import StockActionExecutor, ResultRenderer, StockActionResult, StockActionCompoundResult
 from langchain_openai import ChatOpenAI
@@ -9,13 +13,15 @@ from tools import STOCK_ACTIONS
 from prompts import TOOL_SELECTION_PROMPT, GET_STOCK_SYMBOL_PROMPT, FINANCE_QUERY_CLASSIFICATION_PROMPT
 from utils.agent_state import StockAgentState
 import os
-from galileo.handlers.langchain import GalileoCallback
+from galileo_core.schemas.logging.llm import Message, ToolCall, ToolCallFunction
 from langchain_core.runnables import RunnableConfig
-from galileo import galileo_context
+from galileo import GalileoLogger
+import inspect
 
-gcb = GalileoCallback()
 
 load_dotenv()
+
+galileo_logger = GalileoLogger(project=os.getenv("GALILEO_PROJECT"), log_stream=os.getenv("GALILEO_LOG_STREAM"))
 
 action = StockActionExecutor()
 
@@ -45,6 +51,14 @@ def extract_stock_symbol_llm(user_input: str) -> str:
     return None if response == "NONE" else response
 
 def route_stock_action(state: StockAgentState) -> StockAgentState:
+    """ Router function made of multiple LLM calls + some logic.
+    Goal: select the appropriate tool to call based on the user input
+    Steps:
+        1. Extract stock symbol from user input (llm call, extract_stock_symbol_llm)
+        2. Check if the user input is a finance query (llm call, is_finance_query)
+        3. If not, return fallback response
+        4. If yes, select the appropriate tool (llm call) -> only return tool name
+    """
 
     user_input = state["input"]
     last_stock = state.get("last_stock_symbol", None)
@@ -85,6 +99,27 @@ def route_stock_action(state: StockAgentState) -> StockAgentState:
         "last_action": state.get("action", None),
         "result": state.get("result", None),
     }
+    
+    # Log manually here since we need to assemble the LLM's output as tool name + selected args (even if they come from different calls)
+    tool_call_args = json.dumps( # TODO: some hardcoding seems necessary since tool input args != state keys
+        {
+            "user_phrase": new_state.get("input", None),
+            "stock_to_use": new_state.get("last_stock_symbol", None)
+        }
+    )
+    tool_response_message = Message(
+        role="assistant", 
+        content="", 
+        tool_call_id= "fake_id", 
+        tool_calls=[ToolCall(id=tool_response, function=ToolCallFunction(name=tool_response, arguments=tool_call_args))])
+    
+    galileo_logger.add_llm_span(
+        input=tool_selection_prompt,
+        output=tool_response_message,
+        model=llm.model_name,
+        name=f"Router",
+        tools=[{k:v.get_description()} for k,v in STOCK_ACTIONS.items()]
+    )
 
     return new_state
 
@@ -93,6 +128,12 @@ def route_stock_action(state: StockAgentState) -> StockAgentState:
 ########################################################
 
 def execute_stock_action(state: StockAgentState) -> StockAgentState:
+    """ Execute the selected tool.
+    Steps:
+        1. Extract stock symbol from user input (llm call, extract_stock_symbol_llm)
+        2. Execute the selected tool (STOCK_ACTIONS[action_name].execute)
+        3. Return the result
+    """
     action_name = state.get("action", None)
     user_phrase = state.get("input", None)
     stock_to_use = state.get("last_stock_symbol", None)
@@ -101,6 +142,12 @@ def execute_stock_action(state: StockAgentState) -> StockAgentState:
 
     if action_name in STOCK_ACTIONS:
         result = STOCK_ACTIONS[action_name].execute(user_phrase, stock_to_use)
+        
+        galileo_logger.add_tool_span(
+            input=json.dumps({"user_phrase": user_phrase, "stock_to_use": str(stock_to_use)}),
+            output=json.dumps(result.to_dict()),
+            name=action_name,
+        )
 
         extracted_stock = extract_stock_symbol_llm(user_phrase)
         if extracted_stock:
@@ -121,8 +168,8 @@ def execute_stock_action(state: StockAgentState) -> StockAgentState:
 ########################################################
 
 def main():
-
-    with galileo_context() as GC, st.container() as ST:
+    
+    with st.container() as ST:
 
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -137,7 +184,14 @@ def main():
                     st.markdown(message["content"])
 
         if prompt := st.chat_input("Ask me about stocks 🚀, maybe start with 'What can you do?' 📈"):
-
+            n_trace = sum(1 for msg in st.session_state.messages if msg["role"] == "user")
+            galileo_logger.start_trace(
+                input=prompt,
+                name=f"User Interaction {n_trace}",
+                created_at=datetime.now(ZoneInfo("America/Detroit"))
+            )            
+            
+                
             st.chat_message("user").markdown(prompt)
 
             st.session_state.messages.append({"role": "user", "content": prompt})
@@ -155,7 +209,6 @@ def main():
             print("INVOKING DAG...")
 
             cfg = RunnableConfig()
-            cfg['callbacks'] = [gcb]
 
             response = graph.invoke(
                 {
@@ -179,8 +232,12 @@ def main():
                     st.session_state.messages.append({"role": "assistant", "content": stock_action_result})
                 else:
                     st.error(f"Agent did not return a tool response: {response}")
-        
-        galileo_context.flush()
+
+            galileo_logger.conclude(
+                output=json.dumps(stock_action_result.to_dict()),
+                # conclude_all=False  # Whether to conclude all open spans
+            )
+            galileo_logger.flush()
 
 if __name__ == "__main__":
     main()

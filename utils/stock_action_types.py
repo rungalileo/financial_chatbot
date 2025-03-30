@@ -4,6 +4,7 @@ import pandas as pd
 from utils.agent_state import StockAgentState
 from dotenv import load_dotenv
 import os
+import json
 from dataclasses import dataclass
 
 load_dotenv()
@@ -18,8 +19,22 @@ class StockActionCompoundResult:
         self.output_types = output_types
 
     def to_dict(self):
+        # Bogdan: not used anywhere so I'm repurposing it to stringify the data structures for logging to Galileo
+        data_structures_str = []
+        for structure in self.data_structures:
+            try:
+                if isinstance(structure, str):
+                    structure_str = structure
+                elif isinstance(structure, pd.core.frame.DataFrame):
+                    structure_str = json.dumps(structure.to_dict(orient="records"))
+                else:
+                    structure_str = json.dumps(structure)
+            except Exception as e:
+                structure_str = f"Couldn't stringify structure of type {type(structure)}"
+            data_structures_str.append(structure_str)
+            
         return {
-            "data_structures": [structure.to_dict() for structure in self.data_structures],
+            "data_structures": data_structures_str,
             "output_types": self.output_types
         }
 
