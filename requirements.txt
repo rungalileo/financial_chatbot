@@ -41,7 +41,7 @@ execnet==2.1.1
 executing==2.2.0
 faiss-cpu==1.10.0
 fastjsonschema==2.21.1
-filelock==3.17.0
+filelock==3.20.1
 filetype==1.2.0
 fonttools==4.56.0
 frozendict==2.4.6
