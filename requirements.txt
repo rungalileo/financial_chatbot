@@ -107,7 +107,7 @@ llama-parse==0.6.1
 marisa-trie==1.2.1
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
-marshmallow==3.26.1
+marshmallow==3.26.2
 matplotlib==3.10.0
 matplotlib-inline==0.1.7
 mdurl==0.1.2
